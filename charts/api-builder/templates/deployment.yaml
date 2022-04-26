@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-builder.fullname" . }}
+  labels:
+    {{- include "api-builder.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "api-builder.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "api-builder.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "api-builder.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: "INLINE_RUNTIME_CHUNK"
+              value: "{{ .Values.env.inline_runtime_chunk }}"
+            - name: "REACT_APP_STUDIO_NAME"
+              value: "{{ .Values.env.react_app_studio_name }}"
+            - name: "REACT_APP_PROJECT_NAME"
+              value: "{{ .Values.env.react_app_project_name }}"
+            - name: "REACT_APP_API_URL"
+              value: "{{ .Values.env.react_app_api_url }}"
+            - name: "REACT_APP_API_KEY"
+              value: "{{ .Values.env.react_app_api_key }}"
+            - name: "REACT_APP_ACTIVITY_API_URL"
+              value: "{{ .Values.env.react_app_activity_api_url }}"
+            - name: "REACT_APP_USER_MGMT"
+              value: "{{ .Values.env.react_app_user_mgmt }}"
+            - name: "REACT_APP_API_INTERACT_ODATA"
+              value: "{{ .Values.env.react_app_api_interact_odata }}"
+            - name: "REACT_APP_BUILD_URL"
+              value: "{{ .Values.env.react_app_build_url }}"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /swagger
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /swagger
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: data
+            mountPath: /G7
+      volumes:
+      - name: data
+      {{- if .Values.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ include "api-builder.fullname" . }}
+      {{- else }}
+        emptyDir: {}
+      {{- end -}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
